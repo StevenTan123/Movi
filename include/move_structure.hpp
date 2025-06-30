@@ -47,6 +47,90 @@ public:
     }
 };
 
+class TaxonTree {
+public:
+    static const ROOT = 1;
+    static const LOG = 20;
+
+    TaxonTree() : timer(0) {}
+
+    void init(std::string fin) {
+        std::ifstream fin(tree_file);
+        if (!fin.is_open()) {
+            std::cerr << "Failed to open taxonomy tree file" << std::endl;
+            return;
+        }
+
+        uint32_t id_cnt = 0;
+        std::string line, trash;
+        while (std::getline(fin, line)) {
+            uint32_t node, par;
+            std::stringstream ss(line);
+            ss >> node >> trash >> par;
+            if (!taxon_to_id.count(node)) {
+                id_to_taxon.push_back(node);
+                taxon_to_id[node] = id_cnt++;
+            }
+            if (!taxon_to_id.count(par)) {
+                id_to_taxon.push_back(par);
+                taxon_to_id[par] = id_cnt++;
+            }
+            uint32_t node_id = taxon_to_id[node];
+            uint32_t par_id = taxon_to_id[par];
+            adj[par].push_back(node);
+        }
+        fin.close();
+
+        n = id_cnt;
+        cnts.resize(n);
+        t_in.resize(n);
+        t_out.resize(n);
+        anc = std::vector(LOG, std::vector(n, ROOT));
+        dfs_setup(ROOT);
+    }
+
+    void dfs_setup(uint32_t cur, uint32_t par) {
+        anc[0][cur] = par;
+        for (int i = 1; i < LOG; i++) {
+            anc[i][cur] = anc[i - 1][anc[i - 1][cur]];
+        }
+        t_in[cur] = timer++;
+        for (uint32_t child : adj[cur]) {
+            dfs_setup(child);
+        }
+        t_out[cur] = timer++;
+    }
+
+    uint32_t LCA_many(std::vector<uint32_t>& taxon_ids) {
+        uint32_t cur = taxon_to_id[nodes[0]];
+        for (size_t i = 1; i < nodes.size(); i++) {
+            cur = LCA(cur, taxon_to_id[nodes[i]]);
+        }
+        return id_to_taxon[cur];
+    }
+private:
+    int n, timer;
+    std::unordered_map<uint32_t, uint32_t> taxon_to_id;
+    std::vector<uint32_t> id_to_taxon, t_in, t_out, cnts;
+    std::vector<std::vector<uint32_t>> adj, anc;
+    
+    // Returns if x is an ancestor of y.
+    bool is_ancestor(uint32_t x, uint32_t y) {
+        return t_in[x] <= t_in[y] && t_out[x] >= t_out[y];
+    }
+
+    uint32_t LCA(uint32_t x, uint32_t y) {
+        if (is_ancestor(x, y)) return x;
+        int cur = x;
+        for (int i = LOG - 1; i >= 0; i--) {
+            if (!is_ancestor(anc[i][cur], y)) {
+                cur = anc[i][cur];
+            }
+        }
+        return anc[0][cur];
+    }
+}
+
 template<>
 struct std::hash<DocSet> {
     std::size_t operator()(const DocSet &dc) const {
@@ -202,6 +286,7 @@ class MoveStructure {
         // Builds document sets for each run in rlbwt.
         void build_doc_sets();
         uint32_t hash_collapse(std::unordered_map<DocSet, uint32_t> &keep_set, DocSet &bv);
+        void build_lca_colors();
         void build_tree_doc_sets();
         void build_doc_set_similarities();
         void compress_doc_sets();
@@ -232,6 +317,8 @@ class MoveStructure {
         void deserialize_doc_pats(std::string fname);
         void serialize_doc_sets(std::string fname);
         void deserialize_doc_sets(std::string fname);
+        void serialize_lca_colors(std::string fname);
+        void deserialize_lca_colors(std::string fname);
         void serialize_doc_rows();
         void deserialize_doc_rows();
         void load_document_info();
@@ -289,6 +376,10 @@ class MoveStructure {
         std::vector<uint32_t> doc_set_inds;
         std::vector<MoveTally> doc_set_flat_inds;
         sdsl::bit_vector compressed;
+
+        // Taxonomy tree mode.
+        TaxonTree taxon_tree;
+        std::vector<uint32_t> lca_colors;
 
         // Tree over documents
         std::vector<std::vector<uint16_t>> tree;

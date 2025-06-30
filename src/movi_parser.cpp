@@ -72,6 +72,7 @@ bool parse_command(int argc, char** argv, MoviOptions& movi_options) {
         ("color-vectors", "Build a vector of vectors for colors (builds \"ref.fa.doc_sets.bin\")")
         ("compress", "Whether or not we compress doc sets (only keep most frequent few)")
         ("full", "Whether or not to store all document information (or just the sets for each run)")
+        ("lca", "Build colors as the LCA of all documents on the taxonomy tree")
         ("t,threads", "Number of threads for query", cxxopts::value<int>());
 
     auto viewOptions = options.add_options("view")
@@ -172,6 +173,9 @@ bool parse_command(int argc, char** argv, MoviOptions& movi_options) {
                     }
                     if (result.count("compress")) {
                         movi_options.set_compressed(true);
+                    }
+                    if (result.count("lca")) {
+                        movi_options.set_lca_colors(true);
                     }
                     if (result.count("threads") == 1) {
                         std::cerr << "threads: " << result["threads"].as<int>() << "\n";

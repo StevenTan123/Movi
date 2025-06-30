@@ -43,6 +43,7 @@ class MoviOptions {
         bool is_compressed() { return compress; }
         bool is_freq_compressed() { return freq_compressed; }
         bool is_tree_compressed() { return tree_compressed; }
+        bool is_lca_colors() { return is_lca_colors;  }
         bool is_color_move_rows() { return color_move_rows; }
         bool is_flat_color_vectors() { return flat_color_vectors; }
         bool is_color() { return color; }
@@ -112,6 +113,7 @@ class MoviOptions {
         void set_compressed(bool val) { compress = val; }
         void set_freq_compressed(bool val) { freq_compressed = val; }
         void set_tree_compressed(bool val) { tree_compressed = val; }
+        void set_lca_colors(bool val) { is_lca_colors = val; }
         void set_color_move_rows(bool val) { color_move_rows = val; }
         void set_flat_color_vectors(bool val) { flat_color_vectors = val; }
         void set_doc_sets_vector_of_vectors(bool val) { doc_sets_vector_of_vectors = val; }
@@ -195,6 +197,7 @@ class MoviOptions {
         bool compress = false;
         bool freq_compressed = false;
         bool tree_compressed = false;
+        bool is_lca_colors = false;
         bool color_move_rows = false;
         bool color = false;
         bool doc_sets_vector_of_vectors = false;

@@ -361,6 +361,20 @@ void MoveStructure::dfs_times(uint16_t cur, uint16_t &t) {
     t_out[cur] = t++;
 }
 
+void MoveStructure::build_lca_colors() {
+    taxon_tree.init(movi_options->get_index_dir() + "/nodes.dmp");
+
+    std::vector<uint32_t> unique_lca_colors(unique_doc_sets.size());
+    for (size_t i = 0; i < unique_doc_sets.size(); i++) {
+        unique_lca_colors[i] = taxon_tree.LCA(unique_doc_sets[i]);
+    }
+    
+    lca_colors.resize(r);
+    for (size_t i = 0; i < r; i++) {
+        lca_colors[i] = unique_lca_colors[doc_set_inds[i]];
+    }
+}
+
 void MoveStructure::build_tree_doc_sets() {
     std::ifstream fin(movi_options->get_index_dir() + "/doc_set_similarities.txt");
     double distmat[num_species * (num_species - 1) / 2];
@@ -2965,6 +2979,24 @@ void MoveStructure::deserialize_doc_sets(std::string fname) {
         }
     }
     std::cerr << "Fraction of runs without color: " << (double) missing_cnt / r << std::endl;*/
+}
+
+void MoveStructure::serialize_lca_colors(std::string fname) {
+    std::ofstream fout(fname, std::ios::out | std::ios::binary);
+    std::cerr << "Writing lca colors to: " << fname << std::endl;
+
+    fout.write(reinterpret_cast<char*>(&lca_colors[0]), r * sizeof(lca_colors[0]));
+    fout.close();
+}
+
+void MoveStructure::deserialize_lca_colors(std::string fname) {
+    std::ifstream fin(fname, std::ios::in | std::ios::binary);
+    
+    lca_colors.resize(r);
+    fin.read(reinterpret_cast<char*>(&lca_colors[0]), r * sizeof(lca_colors[0]));
+    fin.close();
+    
+    std::cerr << "Finished deserializing lca colors" << std::endl;
 }
 
 void MoveStructure::serialize() {

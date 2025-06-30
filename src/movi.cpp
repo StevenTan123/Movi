@@ -48,6 +48,11 @@ void color(MoveStructure& mv_, MoviOptions& movi_options) {
         mv_.build_doc_sets();
         std::cerr << "Done building document sets" << std::endl;
         mv_.serialize_doc_sets(movi_options.get_index_dir() + "/doc_sets.bin");
+    } else if (movi_options.is_lca_colors()) {
+        mv_.build_lca_colors();
+        
+        std::cerr << "Done building lca colors" << std::endl;
+        serialize_lca_colors(movi_options->get_index_dir() + "/lca_colors.bin");
     } else {
         if (!movi_options.is_compressed()) {
             mv_.fill_run_offsets();
