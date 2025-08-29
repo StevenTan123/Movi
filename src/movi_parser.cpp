@@ -51,6 +51,7 @@ bool parse_command(int argc, char** argv, MoviOptions& movi_options) {
         ("compress", "Use compressed document sets for classification")
         ("freq-compress", "Use frequency compressed document sets for classification")
         ("tree-compress", "Use tree compressed document sets for classification")
+        ("lca", "Use lca colors for classification")
         ("color-move-rows", "Color the move rows, query is not performed")
         ("color-vectors", "Use vector of vectors for colors (requires \"ref.fa.doc_sets.bin\")")
         ("bin-width", "The width of the bin used for classification", cxxopts::value<uint32_t>())
@@ -220,6 +221,9 @@ bool parse_command(int argc, char** argv, MoviOptions& movi_options) {
                             if (result.count("tree-compress")) {
                                 movi_options.set_tree_compressed(true);
                                 movi_options.set_freq_compressed(false);
+                            }
+                            if (result.count("lca")) {
+                                movi_options.set_lca_colors(true);
                             }
                             if (result.count("out-file")) {
                                 movi_options.set_out_file(result["out-file"].as<std::string>());

@@ -49,7 +49,6 @@ public:
 
 class TaxonTree {
 public:
-    static const ROOT = 1;
     static const LOG = 20;
 
     TaxonTree() : timer(0) {}
@@ -81,12 +80,16 @@ public:
         }
         fin.close();
 
+        // Root of taxonomy tree has taxon id 1.
+        assert(taxon_to_id.count(1));
+        root = taxon_to_id[1];
+
         n = id_cnt;
         cnts.resize(n);
         t_in.resize(n);
         t_out.resize(n);
-        anc = std::vector(LOG, std::vector(n, ROOT));
-        dfs_setup(ROOT);
+        anc = std::vector(LOG, std::vector(n, root));
+        dfs_setup(root);
     }
 
     void dfs_setup(uint32_t cur, uint32_t par) {
@@ -108,11 +111,27 @@ public:
         }
         return id_to_taxon[cur];
     }
+
+    void dfs_classify(uint32_t cur, uint32_t depth) {
+        if (cnts[cur] > best_candidate.first) {
+            best_candidate = {cnts[cur], cur};
+        }
+        for (uint32_t child : adj[cur]) {
+            dfs_classify(child, depth + 1);
+        }
+    }
+
+    uint32_t classify() {
+        best_candidate = {0, 0};
+        dfs_classify(root, 0);
+        return id_to_taxon[best_candidate.second];
+    }
 private:
-    int n, timer;
+    int n, timer, root;
     std::unordered_map<uint32_t, uint32_t> taxon_to_id;
     std::vector<uint32_t> id_to_taxon, t_in, t_out, cnts;
     std::vector<std::vector<uint32_t>> adj, anc;
+    std::tuple<uint32_t, uint32_t, uint32_t> best_candidate;
     
     // Returns if x is an ancestor of y.
     bool is_ancestor(uint32_t x, uint32_t y) {

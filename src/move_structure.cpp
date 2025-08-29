@@ -366,7 +366,7 @@ void MoveStructure::build_lca_colors() {
 
     std::vector<uint32_t> unique_lca_colors(unique_doc_sets.size());
     for (size_t i = 0; i < unique_doc_sets.size(); i++) {
-        unique_lca_colors[i] = taxon_tree.LCA(unique_doc_sets[i]);
+        unique_lca_colors[i] = taxon_tree.LCA_many(unique_doc_sets[i]);
     }
     
     lca_colors.resize(r);
