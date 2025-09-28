@@ -229,12 +229,12 @@ void query(MoveStructure& mv_, MoviOptions& movi_options) {
                         if (movi_options.is_reverse())
                             std::reverse(query_seq.begin(), query_seq.end());
                         mq = MoveQuery(query_seq);
-                        if (movi_options.is_pml()) {
-                            mv_.out_file << read_struct.id << ",";
-                            total_ff_count += mv_.query_pml(mq);
-                        } else if (movi_options.is_zml()) {
+                        if (movi_options.is_zml()) {
                             mv_.out_file << read_struct.id << ",";
                             total_ff_count += mv_.query_zml(mq);
+                        } else if (movi_options.is_pml()) {
+                            mv_.out_file << read_struct.id << ",\n";
+                            total_ff_count += mv_.query_pml(mq);
                         }
 
                         #pragma omp critical
@@ -479,23 +479,23 @@ int main(int argc, char** argv) {
                     mv_.fill_run_offsets();
                     std::string fname = movi_options.get_index_dir() + "/doc_pats.bin";
                     mv_.deserialize_doc_pats(fname);
-                } else {
-                    if (movi_options.is_doc_sets_vector_of_vectors()) {
-                        if (!movi_options.is_freq_compressed() and !movi_options.is_tree_compressed()) {
-                            std::string fname = movi_options.get_index_dir() + "/doc_sets.bin";
-                            mv_.deserialize_doc_sets(fname);
-                        } else if (movi_options.is_freq_compressed()) {
-                            std::string fname = movi_options.get_index_dir() + "/compress_doc_sets.bin";
-                            mv_.deserialize_doc_sets(fname);
-                        } else if (movi_options.is_tree_compressed()) {
-                            std::string fname = movi_options.get_index_dir() + "/tree_doc_sets.bin";
-                            mv_.deserialize_doc_sets(fname);
-                        }
-                    } else {
-                        mv_.deserialize_doc_sets_flat();
-                    }
-                    mv_.load_document_info();
                 }
+                if (movi_options.is_doc_sets_vector_of_vectors()) {
+                    if (!movi_options.is_freq_compressed() and !movi_options.is_tree_compressed()) {
+                        std::string fname = movi_options.get_index_dir() + "/doc_sets.bin";
+                        mv_.deserialize_doc_sets(fname);
+                    } else if (movi_options.is_freq_compressed()) {
+                        std::string fname = movi_options.get_index_dir() + "/compress_doc_sets.bin";
+                        mv_.deserialize_doc_sets(fname);
+                    } else if (movi_options.is_tree_compressed()) {
+                        std::string fname = movi_options.get_index_dir() + "/tree_doc_sets.bin";
+                        mv_.deserialize_doc_sets(fname);
+                    }
+                } else {
+                    mv_.deserialize_doc_sets_flat();
+                }
+                
+                mv_.load_document_info();
                 mv_.out_file.open(movi_options.get_out_file());
                 mv_.initialize_classify_cnts();
             }

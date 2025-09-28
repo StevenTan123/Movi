@@ -163,6 +163,7 @@ class MoveStructure {
         void build_rlbwt();
         uint64_t query_pml(MoveQuery& mq);
         uint64_t query_backward_search(MoveQuery& mq, int32_t& pos_on_r);
+        void score_zml(MoveInterval& prev_interval, uint64_t match_len, std::vector<uint32_t>& scores);
         uint64_t query_zml(MoveQuery& mq);
 
         void query_all_kmers(MoveQuery& mq, bool kmer_counts = false);
@@ -211,6 +212,7 @@ class MoveStructure {
         // Finds SA entries of all rows in BWT.
         void find_sampled_SA_entries();
         uint64_t get_SA_entries(uint64_t idx, uint64_t offset);
+        std::vector<uint32_t>& get_classify_cnts() { return classify_cnts; }
 
         // Fill the run offsets array (used for building colors among other things)
         void fill_run_offsets();
@@ -221,7 +223,7 @@ class MoveStructure {
         void build_doc_set_similarities();
         void compress_doc_sets();
         void compute_color_ids_from_flat();
-        // Finds documents corresponding to rows in BWT.
+        // Finds documents corresponding to rows in BWT. 
         void build_doc_pats();
         // Writes frequencies of document sets to file.
         void write_doc_set_freqs(std::string fname);
@@ -297,6 +299,10 @@ class MoveStructure {
         std::vector<uint32_t> to_taxon_id;
         // log length of each species
         std::vector<double> log_lens;
+        // Naming below can be a bit confusing. Sometimes genomes of one species may not be
+        // consecutive, but we want to consider them part of the same document. Then, num_docs
+        // refers to the total number of chunks; and num_species refers to the actual number of
+        // unique documents. Example: 1 2 3 1 3 4 => num_docs=6, num_species=4
         uint32_t num_docs;
         uint32_t num_species;
 
@@ -326,6 +332,7 @@ class MoveStructure {
 
         // Counts for classification
         std::vector<uint32_t> classify_cnts;
+        std::vector<uint32_t> zml_scores;
         std::vector<double> doc_scores;
         const double log4 = log(4);
 

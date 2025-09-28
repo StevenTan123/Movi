@@ -2356,6 +2356,43 @@ uint64_t MoveStructure::backward_search_step(std::string& R, int32_t& pos_on_r, 
     return ff_count;
 }
 
+void MoveStructure::score_zml(MoveInterval& prev_interval, uint64_t match_len, std::vector<uint32_t>& scores) {
+    // Classification based on maximal matching
+    if (movi_options->is_multi_classify() && match_len >= movi_options->get_min_match_len()) {
+        std::vector<bool> docs_seen(num_species);
+        if (prev_interval.run_start == prev_interval.run_end) {
+            for (uint64_t i = prev_interval.offset_start; i <= prev_interval.offset_end; i++) {
+                uint64_t full_ind = run_offsets[prev_interval.run_start] + i;
+                uint16_t cur_doc = doc_pats[full_ind];
+                docs_seen[cur_doc] = true;
+            }   
+        } else {
+            for (uint64_t i = prev_interval.offset_start; i < get_n(prev_interval.run_start); i++) {
+                uint64_t full_ind = run_offsets[prev_interval.run_start] + i;
+                uint16_t cur_doc = doc_pats[full_ind];
+                docs_seen[cur_doc] = true;
+            }    
+            for (uint64_t r_ind = prev_interval.run_start + 1; r_ind < prev_interval.run_end; r_ind++) {
+                for (uint64_t i = 0; i < get_n(r_ind); i++) {
+                    uint64_t full_ind = run_offsets[r_ind] + i;
+                    uint16_t cur_doc = doc_pats[full_ind];
+                    docs_seen[cur_doc] = true;
+                }  
+            } 
+            for (uint64_t i = 0; i <= prev_interval.offset_end; i++) {
+                uint64_t full_ind = run_offsets[prev_interval.run_end] + i;
+                uint16_t cur_doc = doc_pats[full_ind];
+                docs_seen[cur_doc] = true;
+            }
+        }
+        for (int i = 0; i < num_species; i++) {
+            if (docs_seen[i]) {
+                scores[i] += match_len;
+            }
+        }
+    }
+}
+
 uint64_t MoveStructure::query_zml(MoveQuery& mq) {
     auto& query_seq = mq.query();
     int32_t pos_on_r = query_seq.length() - 1;
@@ -2372,10 +2409,9 @@ uint64_t MoveStructure::query_zml(MoveQuery& mq) {
         return 0;
     }
 
-    // Multi-class classification
     if (movi_options->is_multi_classify()) {
-        for (uint16_t i = 0; i < num_species; i++) {
-            classify_cnts[i] = 0;
+        for (int i = 0; i < num_species; i++) {
+            zml_scores[i] = 0;
         }
     }
 
@@ -2388,34 +2424,7 @@ uint64_t MoveStructure::query_zml(MoveQuery& mq) {
             pos_on_r -= 1;
             match_len += 1;
         } else {
-            // Classification based on maximal matching
-            if (movi_options->is_multi_classify() && match_len >= movi_options->get_min_match_len()) {
-                if (prev_interval.run_start == prev_interval.run_end) {
-                    for (uint64_t i = prev_interval.offset_start; i <= prev_interval.offset_end; i++) {
-                        uint64_t full_ind = run_offsets[prev_interval.run_start] + i;
-                        uint16_t cur_doc = doc_pats[full_ind];
-                        classify_cnts[cur_doc] += match_len;
-                    }   
-                } else {
-                    for (uint64_t i = prev_interval.offset_start; i < get_n(prev_interval.run_start); i++) {
-                        uint64_t full_ind = run_offsets[prev_interval.run_start] + i;
-                        uint16_t cur_doc = doc_pats[full_ind];
-                        classify_cnts[cur_doc] += match_len;
-                    }    
-                    for (uint64_t r_ind = prev_interval.run_start + 1; r_ind < prev_interval.run_end; r_ind++) {
-                        for (uint64_t i = 0; i < get_n(r_ind); i++) {
-                            uint64_t full_ind = run_offsets[r_ind] + i;
-                            uint16_t cur_doc = doc_pats[full_ind];
-                            classify_cnts[cur_doc] += match_len;
-                        }  
-                    } 
-                    for (uint64_t i = 0; i <= prev_interval.offset_end; i++) {
-                        uint64_t full_ind = run_offsets[prev_interval.run_end] + i;
-                        uint16_t cur_doc = doc_pats[full_ind];
-                        classify_cnts[cur_doc] += match_len;
-                    }           
-                }
-            }
+            score_zml(prev_interval, match_len, zml_scores);
 
             mq.add_ml(match_len, movi_options->is_stdout());
             pos_on_r -= 1;
@@ -2433,20 +2442,22 @@ uint64_t MoveStructure::query_zml(MoveQuery& mq) {
         match_len = 0;
     }
     mq.add_ml(match_len, movi_options->is_stdout());
+    score_zml(interval, match_len, zml_scores);
 
     // Document occuring the most is the genotype we think the query is from.
     if (movi_options->is_multi_classify()) {
         uint16_t best_doc = 0;
         for (uint16_t i = 1; i < num_species; i++) {
-            if (classify_cnts[i] > classify_cnts[best_doc]) {
+            if (zml_scores[i] > zml_scores[best_doc]) {
                 best_doc = i;
             }
         }
         
         // Document occuring the most is the genotype we think the query is from.
-        out_file << to_taxon_id[best_doc] << " ";
+        //out_file << to_taxon_id[best_doc];
+        out_file << "ZML: ";
         for (uint16_t i = 0; i < num_species; i++) {
-        //    out_file << classify_cnts[i] << " ";
+            out_file << zml_scores[i] << " ";
         }
         out_file << "\n";
     }
@@ -2586,8 +2597,12 @@ uint64_t MoveStructure::query_pml(MoveQuery& mq) {
             } else {
                 doc_scores[i] = 0;
             }
+            zml_scores[i] = 0;
         }
     }
+
+    std::vector<uint32_t> test_cnts(num_species);
+    uint32_t prev_pos_on_r = R.length() - 1; 
 
     uint16_t best_doc = std::numeric_limits<uint16_t>::max(); // for multi-class classification
     uint16_t second_best_doc = std::numeric_limits<uint16_t>::max();
@@ -2677,6 +2692,24 @@ uint64_t MoveStructure::query_pml(MoveQuery& mq) {
                 exit(0);
             }
         }
+
+        if (match_len == 0) {
+            // For testing, take last PML peak and run exact match on that substring.
+            if (prev_pos_on_r - pos_on_r >= 5) {
+                std::string query_substr = R.substr(pos_on_r + 1, prev_pos_on_r - pos_on_r);
+                MoveQuery cur_query(query_substr);
+                query_zml(cur_query);
+                out_file << "PML: ";
+                for (size_t i = 0; i < num_species; i++) {
+                    out_file << test_cnts[i] << " ";
+                } 
+                out_file << "\n";
+            }
+            prev_pos_on_r = pos_on_r;
+            for (size_t i = 0; i < num_species; i++) {
+                test_cnts[i] = 0;
+            } 
+        }
     
         sum_matching_lengths += match_len;
         mq.add_ml(match_len, movi_options->is_stdout());
@@ -2736,6 +2769,7 @@ uint64_t MoveStructure::query_pml(MoveQuery& mq) {
 
                 for (int doc : cur_set) {
                     if (!movi_options->is_pvalue_scoring()) {
+                        test_cnts[doc]++;
                         classify_cnts[doc]++;
                         if (doc != best_doc) {
                             if (best_doc == std::numeric_limits<uint16_t>::max() || classify_cnts[doc] > classify_cnts[best_doc]) {
@@ -2765,11 +2799,18 @@ uint64_t MoveStructure::query_pml(MoveQuery& mq) {
         }
     }
 
+    
+    uint16_t zml_best = 0;
+    for (int i = 1; i < num_species; i++) {
+        if (zml_scores[i] > zml_scores[zml_best]) {
+            zml_best = i;
+        }
+    }
     if (movi_options->is_multi_classify()) {
         float PML_mean = static_cast<float>(sum_matching_lengths) / mq.query().length();
         if (PML_mean < UNCLASSIFIED_THRESHOLD || best_doc == std::numeric_limits<uint16_t>::max()) {
             // Not present
-            out_file << "0,0\n";
+            out_file << "0,0,0\n";
         } else {
             if (second_best_doc == std::numeric_limits<uint16_t>::max()) {
                 out_file << to_taxon_id[best_doc] << ",0";
@@ -2792,9 +2833,23 @@ uint64_t MoveStructure::query_pml(MoveQuery& mq) {
                     out_file << to_taxon_id[best_doc] << ",0";
                 }
             }
+            out_file << "," << to_taxon_id[zml_best];
             out_file << "\n";
         }
     }
+
+    /*out_file << "PML: ";
+    for (int i = 0; i < num_species; i++) {
+        out_file << classify_cnts[i] << " ";
+    }
+    out_file << "\n";
+
+    
+    out_file << "ZML: ";
+    for (int i = 0; i < num_species; i++) {
+        out_file << zml_scores[i] << " ";
+    }
+    out_file << "\n";*/
 
     return ff_count_tot;
 }
@@ -3427,8 +3482,7 @@ void MoveStructure::load_document_info() {
     doc_offsets_file.close();
     num_docs = doc_offsets.size();
     std::cerr << "num_docs: " << num_docs << std::endl;
-    num_species = num_docs;
-
+    
     // Read in document taxon id
     std::ifstream doc_ids_file(movi_options->get_index_dir() + "/ref.fa.doc_ids");
     if (doc_ids_file.good()) {
@@ -3509,6 +3563,7 @@ void MoveStructure::deserialize_sampled_SA() {
 
 void MoveStructure::initialize_classify_cnts() {
     classify_cnts.resize(num_species, 0);
+    zml_scores.resize(num_species, 0);
     doc_scores.resize(num_species, 0);
 }
 
